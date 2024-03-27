@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gocolly/colly"
+	"github.com/joho/godotenv"
 )
 
 type CrawlerHandler struct {
@@ -121,7 +123,11 @@ func (h *CrawlerHandler) InitCrawler() {
 }
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI("6750578658:AAEIHwkjVpgmLs0WEmkt8wKI2q6aolfM57Y")
+	err := godotenv.Load(".env")
+	if err != nil {
+		panic(err)
+	}
+	bot, err := tgbotapi.NewBotAPI(string(os.Getenv("BOT_TOKEN")))
 	if err != nil {
 		slog.Info(err.Error())
 	}
