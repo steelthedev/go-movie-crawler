@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gocolly/colly"
 )
 
@@ -11,6 +12,8 @@ type CrawlerHandler struct {
 	Collector    *colly.Collector
 	PageLimit    int
 	PageToScrape string
+	Update       tgbotapi.UpdatesChannel
+	Bot          *tgbotapi.BotAPI
 }
 
 func contains(slice []string, str string) bool {
@@ -22,11 +25,13 @@ func contains(slice []string, str string) bool {
 	return false
 }
 
-func NewCrawlerHandler(collector *colly.Collector, pageLimit int, pageToScrape string) *CrawlerHandler {
+func NewCrawlerHandler(collector *colly.Collector, pageLimit int, pageToScrape string, update tgbotapi.UpdatesChannel, bot *tgbotapi.BotAPI) *CrawlerHandler {
 	return &CrawlerHandler{
 		Collector:    collector,
 		PageLimit:    pageLimit,
 		PageToScrape: pageToScrape,
+		Update:       update,
+		Bot:          bot,
 	}
 
 }
@@ -94,14 +99,31 @@ func (h *CrawlerHandler) InitCrawler() {
 		slog.Error("Could not finish %s", err)
 		return
 	}
-	fmt.Println(data)
+	for update := range h.Update {
+		if update.Message != nil {
+			for _, link := range data {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, link)
+				h.Bot.Send(msg)
+			}
+		}
+
+	}
 	h.Collector.Visit(h.PageToScrape)
 }
 
 func main() {
+	bot, err := tgbotapi.NewBotAPI("6750578658:AAEIHwkjVpgmLs0WEmkt8wKI2q6aolfM57Y")
+	if err != nil {
+		slog.Info(err.Error())
+	}
+	bot.Debug = true
+	fmt.Println("Authorized ", bot.Self.UserName)
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+	updates := bot.GetUpdatesChan(u)
 
 	c := colly.NewCollector()
-	handler := NewCrawlerHandler(c, 5, "https://www.awafim.tv/browse/page/1")
+	handler := NewCrawlerHandler(c, 5, "https://www.awafim.tv/browse/page/1", updates, &tgbotapi.BotAPI{})
 	handler.InitCrawler()
 
 }
