@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gocolly/colly"
@@ -99,15 +100,23 @@ func (h *CrawlerHandler) InitCrawler() {
 		slog.Error("Could not finish %s", err)
 		return
 	}
-	for update := range h.Update {
-		if update.Message != nil {
-			for _, link := range data {
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, link)
-				h.Bot.Send(msg)
+	var wg sync.WaitGroup
+	wg.Add(len(data))
+
+	for _, link := range data {
+		go func(link string) {
+			defer wg.Done()
+			fmt.Println("Sending messages")
+			msg := tgbotapi.NewMessageToChannel("@awafim_crawler_bot", link)
+			_, err := h.Bot.Send(msg)
+			if err != nil {
+				slog.Error(err.Error())
 			}
-		}
+		}(link)
 
 	}
+	wg.Wait()
+
 	h.Collector.Visit(h.PageToScrape)
 }
 
@@ -123,7 +132,7 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 
 	c := colly.NewCollector()
-	handler := NewCrawlerHandler(c, 5, "https://www.awafim.tv/browse/page/1", updates, &tgbotapi.BotAPI{})
+	handler := NewCrawlerHandler(c, 5, "https://www.awafim.tv/browse/page/1", updates, bot)
 	handler.InitCrawler()
 
 }
